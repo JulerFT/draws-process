@@ -1,6 +1,8 @@
 const sequelize = require('./config/database');
 const Ticket = require('./models/ticket.model');
 const Winner = require('./models/winner.model');
+const WinnerFinish = require('./models/winner-finish.model');
+
 const winston = require('winston');
 const path = require('path');
 
@@ -20,7 +22,7 @@ const logger = winston.createLogger({
   ],
 });
 
-function desordenarArray(array) {
+function barajar(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
@@ -48,41 +50,82 @@ function generarParticipantesPorOpciones(participantes, forMeetAndGreet) {
 
 // Excluir ganadores
 function excluirGanadores(participantesArray, ganadores) {
-  return participantesArray.filter((participante) => !ganadores.includes(participante));
+  const ganadoresSet = new Set(ganadores);
+  return participantesArray.filter(participante => !ganadoresSet.has(participante));
 }
+
+logger.separator = () => console.log('\n');
 
 // Seleccionar ganadores aleatoriamente
 function seleccionarGanadores(participantesArray, count) {
-  const shuffled = desordenarArray(participantesArray);
-  const uniqueGanadores = new Set();
+  let opcionesParticipantes = barajar([...participantesArray]);
+  
+  logger.info(`Barajada de Participantes por opciones: \n ${JSON.stringify(opcionesParticipantes)}`);
+  logger.info(`Seleccionando ganadores aleatoriamente...`);
 
-  for (const participante of shuffled) {
-    if (!uniqueGanadores.has(participante)) {
-      uniqueGanadores.add(participante);
-      if (uniqueGanadores.size === count) break;
+  const ganadores = [];
+
+  for (let index = 0; index < count; index++) {
+    if (opcionesParticipantes.length === 0) {
+      break; // Salir del bucle si ya no hay participantes
+    }
+    
+    const randomIndex = Math.floor(Math.random() * opcionesParticipantes.length);
+    
+    const ganador = opcionesParticipantes[randomIndex];
+    ganadores.push(ganador);
+
+    opcionesParticipantes = opcionesParticipantes.filter(participante => participante !== ganador);
+
+    const ultimaVuelta = (index + 1) === count; 
+    if(!ultimaVuelta){
+      // Volver a desordenar el array restante
+      opcionesParticipantes = barajar(opcionesParticipantes);
     }
   }
 
-  return Array.from(uniqueGanadores);
+  return {ganadores, perdedores: opcionesParticipantes};
 }
 
 // Guardar ganadores en la base de datos
 async function guardarGanadores(ganadoresId, awardType) {
+  const transaction = await sequelize.transaction();
+
   const ganadoresData = ganadoresId.map((id) => ({
     client_id: id,
     award_type: awardType,
   }));
-  await Winner.bulkCreate(ganadoresData);
+
+  try {
+    await Winner.bulkCreate(ganadoresData, { transaction });
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 // Procesar los ganadores
 async function procesarGanadores() {
-  logger.info('Iniciando proceso de ganadores - sorteo Messi 2025.');
+  logger.info('INICIO DEL SORTEO');
+  logger.separator();
 
   try {
     logger.info(`Obteniendo participantes...`);
 
     await sequelize.authenticate();
+
+    // const ganadoresFinales = await WinnerFinish.findAll({
+    //   attributes: [
+    //     sequelize.literal('COUNT(id)')
+    //   ],
+    //   raw: true
+    // });
+
+    // if(ganadoresFinales.length > 0){
+    //   logger.error(`Ya se realizó el sorteo`);
+    //   return;
+    // }
 
     const participantes = await Ticket.findAll({
       attributes: [
@@ -94,47 +137,72 @@ async function procesarGanadores() {
       raw: true
     });
 
-    logger.info(`${participantes.length} Participantes: ${JSON.stringify(participantes)}`);
+    logger.info(`${participantes.length} Participantes: \n ${JSON.stringify(participantes)}`);
+    logger.separator();
+
+    /****************** PRIMER SORTEO *****************************************/
+
+    logger.info(`PROCENSANDO PRIMER SORTEO - M&G TITULARES`);
+    logger.separator();
 
     const participantesOpcionesMG = generarParticipantesPorOpciones(participantes, true);
-    logger.info(`Participantes por opciones para M&G: ${JSON.stringify(participantesOpcionesMG)}`);
+    logger.info(`Participantes por cantidad de opciones: \n ${JSON.stringify(participantesOpcionesMG)}`);
 
-    logger.info(`Procesando primer sorteo`);
-
-    const titularGanadoresMG = seleccionarGanadores(participantesOpcionesMG, 5);
-    logger.info(`M&G Titulares - ${titularGanadoresMG.length} ganadores: ${JSON.stringify(titularGanadoresMG)}`);
-
+    const {ganadores: titularGanadoresMG, perdedores: participantesSuplentesMG} = seleccionarGanadores(participantesOpcionesMG, 5);    
     await guardarGanadores(titularGanadoresMG, 'M&G Titulares');
+    logger.info(`${titularGanadoresMG.length} ganadores: ${JSON.stringify(titularGanadoresMG)}`);
+    logger.info(`Resto de Participantes por opciones (Perdedores): \n ${JSON.stringify(participantesSuplentesMG)}`);
+    logger.separator();
 
-    logger.info(`Procesando segundo sorteo`);
+    /****************************************************************************/
 
-    let participantesSuplentesMG = excluirGanadores(participantesOpcionesMG, titularGanadoresMG);
-    const suplenteGanadoresMG = seleccionarGanadores(participantesSuplentesMG, 20);
+
+    /****************** SEGUNDO SORTEO *****************************************/
+
+    logger.info(`PROCENSANDO SEGUNDO SORTEO - M&G SUPLENTES`);
+    logger.separator();
+
+    const {ganadores: suplenteGanadoresMG} = seleccionarGanadores(participantesSuplentesMG, 20);
     await guardarGanadores(suplenteGanadoresMG, 'M&G Suplentes');
-    logger.info(`M&G Suplentes - ${suplenteGanadoresMG.length} ganadores: ${JSON.stringify(suplenteGanadoresMG)}`);
+    logger.info(`${suplenteGanadoresMG.length} ganadores: ${JSON.stringify(suplenteGanadoresMG)}`);
+    logger.separator();
+
+    /****************************************************************************/
+
+    /****************** TERCER SORTEO *****************************************/
+    logger.info(`PROCENSANDO TERCER SORTEO - ENTRADAS`);
+    logger.separator();
 
     let participantesEntradas = generarParticipantesPorOpciones(participantes, false);
     participantesEntradas = excluirGanadores(participantesEntradas, titularGanadoresMG);
-    logger.info(`Participantes por opciones para Entradas: ${JSON.stringify(participantesEntradas)}`);
+    logger.info(`Participantes por cantidad de opciones: \n ${JSON.stringify(participantesEntradas)}`);
 
-    logger.info(`Procesando tercer sorteo`);
-
-    const titularGanadoresEntradas = seleccionarGanadores(participantesEntradas, 50);
+    const {ganadores: titularGanadoresEntradas, perdedores: participantesSuplentesEntradas} = seleccionarGanadores(participantesEntradas, 50);
     await guardarGanadores(titularGanadoresEntradas, 'Entradas Titulares');
-    logger.info(`Entradas Titulares - ${titularGanadoresEntradas.length} ganadores: ${JSON.stringify(titularGanadoresEntradas)}`);
+    logger.info(`${titularGanadoresEntradas.length} ganadores: ${JSON.stringify(titularGanadoresEntradas)}`);
+    logger.info(`Resto de Participantes por opciones (Perdedores): \n ${JSON.stringify(participantesSuplentesEntradas)}`);
+    logger.separator();
 
-    logger.info(`Procesando cuarto sorteo`);
+    /****************************************************************************/
 
-    let participantesSuplentesEntradas = excluirGanadores(participantesEntradas, titularGanadoresEntradas);
-    const suplenteGanadoresEntradas = seleccionarGanadores(participantesSuplentesEntradas, 100);
+
+    /****************** CUARTO SORTEO *****************************************/
+
+    logger.info(`PROCENSANDO CUARTO SORTEO - ENTRADAS SUPLENTES`);
+    logger.separator();
+
+    const {ganadores: suplenteGanadoresEntradas} = seleccionarGanadores(participantesSuplentesEntradas, 100);
     await guardarGanadores(suplenteGanadoresEntradas, 'Entradas Suplentes');
-    logger.info(`Entradas Suplentes - ${suplenteGanadoresEntradas.length} ganadores: ${JSON.stringify(suplenteGanadoresEntradas)}`);
+    logger.info(`${suplenteGanadoresEntradas.length} ganadores: ${JSON.stringify(suplenteGanadoresEntradas)}`);
+    logger.separator();
+
+    /****************************************************************************/
 
   } catch (error) {
     logger.error(`Error en el proceso: ${error.message}`);
   } finally {
     await sequelize.close();
-    logger.info('Fin del proceso de ganadores - sorteo Messi 2025.');
+    logger.info('FIN DEL SORTEO');
   }
 }
 
