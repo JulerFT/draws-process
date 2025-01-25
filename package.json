@@ -1,0 +1,19 @@
+{
+  "name": "process",
+  "version": "1.0.0",
+  "main": "processWinners.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node process-winners.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1",
+    "sequelize": "^6.37.5",
+    "winston": "^3.17.0"
+  }
+}
