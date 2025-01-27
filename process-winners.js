@@ -1,7 +1,6 @@
 const sequelize = require('./config/database');
 const Ticket = require('./models/ticket.model');
 const Winner = require('./models/winner.model');
-const WinnerFinish = require('./models/winner-finish.model');
 
 const winston = require('winston');
 const path = require('path');
