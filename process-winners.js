@@ -22,6 +22,8 @@ const logger = winston.createLogger({
   ],
 });
 
+logger.separator = () => console.log('\n');
+
 function barajar(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -48,13 +50,10 @@ function generarParticipantesPorOpciones(participantes, forMeetAndGreet) {
   return participantesArray;
 }
 
-// Excluir ganadores
 function excluirGanadores(participantesArray, ganadores) {
   const ganadoresSet = new Set(ganadores);
   return participantesArray.filter(participante => !ganadoresSet.has(participante));
 }
-
-logger.separator = () => console.log('\n');
 
 // Seleccionar ganadores aleatoriamente
 function seleccionarGanadores(participantesArray, count) {
@@ -75,6 +74,7 @@ function seleccionarGanadores(participantesArray, count) {
     const ganador = opcionesParticipantes[randomIndex];
     ganadores.push(ganador);
 
+    //QUitamos el ganadore de la lista
     opcionesParticipantes = opcionesParticipantes.filter(participante => participante !== ganador);
 
     const ultimaVuelta = (index + 1) === count; 
@@ -115,18 +115,6 @@ async function procesarGanadores() {
 
     await sequelize.authenticate();
 
-    // const ganadoresFinales = await WinnerFinish.findAll({
-    //   attributes: [
-    //     sequelize.literal('COUNT(id)')
-    //   ],
-    //   raw: true
-    // });
-
-    // if(ganadoresFinales.length > 0){
-    //   logger.error(`Ya se realizó el sorteo`);
-    //   return;
-    // }
-
     const participantes = await Ticket.findAll({
       attributes: [
         'client_id',
@@ -141,7 +129,6 @@ async function procesarGanadores() {
     logger.separator();
 
     /****************** PRIMER SORTEO *****************************************/
-
     logger.info(`PROCENSANDO PRIMER SORTEO - M&G TITULARES`);
     logger.separator();
 
@@ -153,12 +140,10 @@ async function procesarGanadores() {
     logger.info(`${titularGanadoresMG.length} ganadores: ${JSON.stringify(titularGanadoresMG)}`);
     logger.info(`Resto de Participantes por opciones (Perdedores): \n ${JSON.stringify(participantesSuplentesMG)}`);
     logger.separator();
-
     /****************************************************************************/
 
 
     /****************** SEGUNDO SORTEO *****************************************/
-
     logger.info(`PROCENSANDO SEGUNDO SORTEO - M&G SUPLENTES`);
     logger.separator();
 
@@ -166,8 +151,8 @@ async function procesarGanadores() {
     await guardarGanadores(suplenteGanadoresMG, 'M&G Suplentes');
     logger.info(`${suplenteGanadoresMG.length} ganadores: ${JSON.stringify(suplenteGanadoresMG)}`);
     logger.separator();
-
     /****************************************************************************/
+
 
     /****************** TERCER SORTEO *****************************************/
     logger.info(`PROCENSANDO TERCER SORTEO - ENTRADAS`);
@@ -182,12 +167,10 @@ async function procesarGanadores() {
     logger.info(`${titularGanadoresEntradas.length} ganadores: ${JSON.stringify(titularGanadoresEntradas)}`);
     logger.info(`Resto de Participantes por opciones (Perdedores): \n ${JSON.stringify(participantesSuplentesEntradas)}`);
     logger.separator();
-
     /****************************************************************************/
 
 
     /****************** CUARTO SORTEO *****************************************/
-
     logger.info(`PROCENSANDO CUARTO SORTEO - ENTRADAS SUPLENTES`);
     logger.separator();
 
@@ -195,7 +178,6 @@ async function procesarGanadores() {
     await guardarGanadores(suplenteGanadoresEntradas, 'Entradas Suplentes');
     logger.info(`${suplenteGanadoresEntradas.length} ganadores: ${JSON.stringify(suplenteGanadoresEntradas)}`);
     logger.separator();
-
     /****************************************************************************/
 
   } catch (error) {

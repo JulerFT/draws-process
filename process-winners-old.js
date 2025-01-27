@@ -84,6 +84,18 @@ async function procesarGanadores() {
 
     await sequelize.authenticate();
 
+    const ganadoresFinales = await WinnerFinish.findAll({
+      attributes: [
+        sequelize.literal('COUNT(id) AS count')
+      ],
+      raw: true
+    });
+
+    if(ganadoresFinales.length > 0 && Number(ganadoresFinales[0].count) > 0){
+      logger.error(`Ya se realizó el sorteo`);
+      return;
+    }
+
     const participantes = await Ticket.findAll({
       attributes: [
         'client_id',
