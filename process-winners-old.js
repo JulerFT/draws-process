@@ -1,6 +1,8 @@
 const sequelize = require('./config/database');
 const Ticket = require('./models/ticket.model');
 const Winner = require('./models/winner.model');
+const WinnerFinish = require('./models/winner-finish.model');
+
 const winston = require('winston');
 const path = require('path');
 
@@ -95,6 +97,11 @@ async function procesarGanadores() {
       logger.error(`Ya se realizó el sorteo`);
       return;
     }
+
+    console.log('ganadoresFinales', ganadoresFinales);
+    
+
+    return;
 
     const participantes = await Ticket.findAll({
       attributes: [

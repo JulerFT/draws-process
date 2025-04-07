@@ -146,7 +146,7 @@ async function procesarGanadores() {
     logger.info(`PROCENSANDO SEGUNDO SORTEO - M&G SUPLENTES`);
     logger.separator();
 
-    const {ganadores: suplenteGanadoresMG} = seleccionarGanadores(participantesSuplentesMG, 20);
+    const {ganadores: suplenteGanadoresMG} = seleccionarGanadores(participantesSuplentesMG, 5);
     await guardarGanadores(suplenteGanadoresMG, 'M&G Suplentes');
     logger.info(`${suplenteGanadoresMG.length} ganadores: ${JSON.stringify(suplenteGanadoresMG)}`);
     logger.separator();
@@ -173,7 +173,7 @@ async function procesarGanadores() {
     logger.info(`PROCENSANDO CUARTO SORTEO - ENTRADAS SUPLENTES`);
     logger.separator();
 
-    const {ganadores: suplenteGanadoresEntradas} = seleccionarGanadores(participantesSuplentesEntradas, 100);
+    const {ganadores: suplenteGanadoresEntradas} = seleccionarGanadores(participantesSuplentesEntradas, 50);
     await guardarGanadores(suplenteGanadoresEntradas, 'Entradas Suplentes');
     logger.info(`${suplenteGanadoresEntradas.length} ganadores: ${JSON.stringify(suplenteGanadoresEntradas)}`);
     logger.separator();
